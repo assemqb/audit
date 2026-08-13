@@ -1,7 +1,11 @@
 *.wav
 __pycache__/
+.pytest_cache/
 data/audio/
+data_cv/audio/
 .venv/
 .hf_cache/
-results/*.tsv
-results/*.json
+# hyp_*.tsv are raw model output re-derivable by rerunning transcribe.py —
+# metrics/table/errors (the actual audit evidence) are small text, kept in git.
+results/hyp_*.tsv
+results_cv/hyp_*.tsv

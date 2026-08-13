@@ -25,8 +25,11 @@ import os
 from collections import Counter
 
 import jiwer
+import numpy as np
 
 from kk_text import KK_FOLD_MAP, has_kk_letter, normalize, stem, stem_text
+
+N_BOOT = 1000
 
 
 def load(data_dir, hyp_path):
@@ -52,6 +55,30 @@ def cer_safe(refs, hyps):
         return float("nan")
     r, h = zip(*pairs)
     return jiwer.cer(list(r), list(h))
+
+
+def bootstrap_wer_ci(refs, hyps, n_boot=N_BOOT, alpha=0.05, seed=0):
+    """95% CI for corpus WER, resampling whole utterances with replacement.
+
+    A single WER number hides how much it would move if we'd sampled a
+    different 43 utterances from the same distribution — on a small test
+    set that swing can be the whole story. Resampling utterances (not
+    words) preserves each utterance's internal alignment, which is the
+    standard way to bootstrap corpus-level WER.
+    """
+    pairs = [(r, h) for r, h in zip(refs, hyps) if r.strip()]
+    if len(pairs) < 2:
+        return float("nan"), float("nan")
+    r_arr = np.array([p[0] for p in pairs], dtype=object)
+    h_arr = np.array([p[1] for p in pairs], dtype=object)
+    n = len(pairs)
+    rng = np.random.default_rng(seed)
+    scores = np.empty(n_boot)
+    for b in range(n_boot):
+        idx = rng.integers(0, n, size=n)
+        scores[b] = jiwer.wer(list(r_arr[idx]), list(h_arr[idx]))
+    lo, hi = np.quantile(scores, [alpha / 2, 1 - alpha / 2])
+    return round(float(lo), 4), round(float(hi), 4)
 
 
 def classify(ref_w: str, hyp_w: str) -> str:
@@ -118,6 +145,9 @@ def main(args):
     metrics["delta_normalization"] = round(metrics["WER_raw"] - metrics["WER_norm"], 4)
     metrics["delta_kk_graphemes"] = round(metrics["WER_norm"] - metrics["WER_fold"], 4)
     metrics["delta_morphology"] = round(metrics["WER_norm"] - metrics["WER_stem"], 4)
+
+    metrics["WER_norm_ci95"] = list(bootstrap_wer_ci(norm_r, norm_h))
+    metrics["WER_stem_ci95"] = list(bootstrap_wer_ci(stem_r, stem_h))
 
     # --- типология ошибок по выравниванию ---
     types = Counter()
@@ -193,6 +223,11 @@ def main(args):
             w.writerow([i, r, h, round(u, 3) if u != "" else ""])
 
     print(json.dumps(metrics, ensure_ascii=False, indent=2))
+    print(
+        f"\n95% CI (бутстрап, {N_BOOT} прогонов, n={metrics['n_utt']} уттерансов):"
+    )
+    print(f"  WER_norm: [{metrics['WER_norm_ci95'][0]}, {metrics['WER_norm_ci95'][1]}]")
+    print(f"  WER_stem: [{metrics['WER_stem_ci95'][0]}, {metrics['WER_stem_ci95'][1]}]")
     print("\nТипы ошибок:")
     total = sum(types.values())
     for t, c in types.most_common():
