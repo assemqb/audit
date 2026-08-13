@@ -3,5 +3,10 @@ ctranslate2>=4.0.0
 datasets>=2.18.0
 soundfile>=0.12.1
 jiwer>=3.0.0
-torchcodec>=0.13.0
 numpy
+
+# torch/torchcodec are only used to decode FLEURS audio in prepare_data.py —
+# a CPU-side task. Install them separately from the CPU wheel index (see
+# README) so pip doesn't pull a CUDA build that needs a matching nvrtc
+# runtime the machine may not have. GPU acceleration for transcription
+# itself comes from ctranslate2, not torch, so this never costs speed.

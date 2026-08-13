@@ -9,6 +9,7 @@
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
+pip install --index-url https://download.pytorch.org/whl/cpu torch torchcodec
 
 python src/prepare_data.py --minutes 12
 python src/transcribe.py --model large-v3 --lang kk --device auto
