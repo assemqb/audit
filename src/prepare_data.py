@@ -1,26 +1,26 @@
 """
-Шаг 1. Готовим тестовый набор казахской речи.
+Step 1. Build a test set of Kazakh speech.
 
-Два источника на выбор (--source), оба студийные/начитанные — честного
-"спонтанного" казахского корпуса, доступного стримингом с HF, не нашлось
-(issai/Kazakh_Speech_Corpus_2 содержит TV/радио/подкасты ближе к спонтанной
-речи, но лежит как один необработанный tar.gz на 80+ ГБ без разбивки на
-уттерансы — не годится для быстрого аудита):
+Two sources to pick from (--source), both technically "read" speech. No
+honest streamable "spontaneous" Kazakh corpus was found on HF
+(issai/Kazakh_Speech_Corpus_2 has TV/radio/podcast audio, which is closer to
+spontaneous speech, but ships as one unprocessed 80+ GB tar.gz with no split
+into utterances, not practical for a quick audit):
 
-  fleurs        google/fleurs kk_kz — дикторская студийная начитка,
-                чистые условия записи, есть normalized-транскрипция от FLEURS
-  common_voice  Common Voice kk — краудсорсинг: разные микрофоны, устройства,
-                акценты, но текст тоже начитанный по подсказке, не спонтанный
+  fleurs        google/fleurs kk_kz, studio narrator reading, clean
+                recording conditions, has FLEURS' own normalized transcription
+  common_voice  Common Voice kk, crowdsourced: different mics, devices,
+                accents, but the text is still read from a prompt, not spontaneous
 
-Разница между ними — не "речь vs спонтанная речь", а "чистая студия vs
-шумные бытовые условия записи". Это тоже полезный разрез: показывает,
-насколько модель держится за пределами студийного идеала.
+The difference between them isn't "speech vs spontaneous speech", it's
+"clean studio vs noisy everyday recording conditions". That's still a useful
+angle: it shows how much the model relies on studio-quality input.
 
-Качаем в режиме streaming, чтобы не тянуть весь корпус.
+Downloaded in streaming mode so we don't pull the whole corpus.
 
-Результат:
-  <out>/audio/*.wav   — аудио как есть у источника (Whisper сам ресемплит)
-  <out>/refs.tsv      — id \t эталон \t альт.-эталон \t длительность_сек \t источник
+Output:
+  <out>/audio/*.wav   audio as provided by the source (Whisper resamples it itself)
+  <out>/refs.tsv      id \t reference \t alt reference \t duration_sec \t source
 """
 
 import argparse
@@ -40,7 +40,7 @@ os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 import soundfile as sf
 from datasets import load_dataset
 
-TARGET_MINUTES = 12.0  # берём с запасом к требуемым 10 минутам
+TARGET_MINUTES = 12.0  # a bit more than the required 10 minutes, as a buffer
 
 SOURCES = {
     "fleurs": {
@@ -93,7 +93,7 @@ def main(out_dir: str, target_minutes: float, split: str, source: str, limit=Non
         sr = audio["sampling_rate"]
         dur = len(wav) / sr
 
-        # отсекаем совсем короткие огрызки — на них метрика шумит
+        # drop very short scraps, they make the metric noisy
         if dur < 1.0:
             continue
 
@@ -101,10 +101,10 @@ def main(out_dir: str, target_minutes: float, split: str, source: str, limit=Non
         path = os.path.join(audio_dir, f"{uid}.wav")
         sf.write(path, wav, sr)
 
-        # Основной ref сохраняет регистр и пунктуацию как есть у источника —
-        # часть "ошибок" ASR на самом деле разница нормализации, и мы хотим
-        # уметь это показать отдельно. ref_alt — альтернативная нормализация
-        # от самого источника, если она есть (только у FLEURS).
+        # The main ref keeps case and punctuation exactly as the source has
+        # it. Part of ASR "error" is really a normalization mismatch, and we
+        # want to show that separately. ref_alt is the source's own
+        # alternate normalization, when it has one (FLEURS only).
         rows.append(
             {
                 "id": uid,
@@ -133,10 +133,10 @@ def main(out_dir: str, target_minutes: float, split: str, source: str, limit=Non
         writer.writeheader()
         writer.writerows(rows)
 
-    print(f"Источник: {source} ({cfg['dataset']})")
-    print(f"Записей: {len(rows)}")
-    print(f"Суммарная длительность: {total_sec / 60:.2f} мин")
-    print(f"Эталоны: {tsv_path}")
+    print(f"Source: {source} ({cfg['dataset']})")
+    print(f"Utterances: {len(rows)}")
+    print(f"Total duration: {total_sec / 60:.2f} min")
+    print(f"References: {tsv_path}")
 
 
 if __name__ == "__main__":

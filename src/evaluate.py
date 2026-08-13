@@ -1,19 +1,20 @@
 """
-Шаг 3. Метрики + типология ошибок.
+Step 3. Metrics and error typology.
 
-Считаем четыре WER, и разница между ними — главный результат работы:
+We compute four WER variants, and the difference between them is the main
+result of this project:
 
-  1. WER_raw      — без нормализации (как есть)
-  2. WER_norm     — после нормализации регистра/пунктуации
-                    (raw - norm) = сколько "ошибок" создала метрика, а не модель
-  3. WER_fold     — плюс схлопывание ә/ө/ұ/ү/і/ң/қ/ғ в русские аналоги
-                    (norm - fold) = цена казахской графики
-  4. WER_stem     — плюс срезание аффиксов
-                    (norm - stem) = цена агглютинативной морфологии
+  1. WER_raw:  no normalization, as-is
+  2. WER_norm: after normalizing case and punctuation
+               (raw - norm) = how much "error" the metric itself creates, not the model
+  3. WER_fold: plus folding ә/ө/ұ/ү/і/ң/қ/ғ into their Russian look-alikes
+               (norm - fold) = the cost of Kazakh-specific graphemes
+  4. WER_stem: plus stripping affixes
+               (norm - stem) = the cost of agglutinative morphology
 
-Плюс CER и разбор замен по типам.
+Plus CER and a breakdown of substitutions by type.
 
-Запуск:
+Run:
   python src/evaluate.py --hyp results/hyp_large-v3_kk.tsv
 """
 
@@ -61,7 +62,7 @@ def bootstrap_wer_ci(refs, hyps, n_boot=N_BOOT, alpha=0.05, seed=0):
     """95% CI for corpus WER, resampling whole utterances with replacement.
 
     A single WER number hides how much it would move if we'd sampled a
-    different 43 utterances from the same distribution — on a small test
+    different set of utterances from the same distribution. On a small test
     set that swing can be the whole story. Resampling utterances (not
     words) preserves each utterance's internal alignment, which is the
     standard way to bootstrap corpus-level WER.
@@ -82,7 +83,7 @@ def bootstrap_wer_ci(refs, hyps, n_boot=N_BOOT, alpha=0.05, seed=0):
 
 
 def classify(ref_w: str, hyp_w: str) -> str:
-    """Классифицируем одну замену слова."""
+    """Classify a single word substitution into an error type."""
     if ref_w.isdigit() or hyp_w.isdigit():
         return "числа/нормализация"
 
@@ -149,7 +150,7 @@ def main(args):
     metrics["WER_norm_ci95"] = list(bootstrap_wer_ci(norm_r, norm_h))
     metrics["WER_stem_ci95"] = list(bootstrap_wer_ci(stem_r, stem_h))
 
-    # --- типология ошибок по выравниванию ---
+    # error typology from the word alignment
     types = Counter()
     chars = Counter()
     examples = []
@@ -179,7 +180,7 @@ def main(args):
                     types["вставка слова"] += 1
                     examples.append({"utt": ids[k], "type": "вставка слова", "ref": "", "hyp": b})
 
-    # --- кандидаты в галлюцинации: гипотеза сильно длиннее эталона ---
+    # hallucination candidates: hypothesis is much longer than the reference
     halluc = []
     for i in ids:
         r_len = len(normalize(refs[i]["ref"]).split())
@@ -188,7 +189,7 @@ def main(args):
             halluc.append({"id": i, "ref_len": r_len, "hyp_len": h_len,
                            "hyp": hyps[i]["hyp"][:300]})
 
-    # --- смена языка ---
+    # detected-language distribution
     lang_counter = Counter(
         hyps[i].get("detected_lang", "") for i in ids if hyps[i].get("detected_lang")
     )
@@ -212,7 +213,7 @@ def main(args):
         w.writeheader()
         w.writerows(examples)
 
-    # таблица "что сказали / что распозналось" для отчёта
+    # "reference vs hypothesis" table for the report
     with open(os.path.join(args.results, f"table_{tag}.tsv"), "w",
               encoding="utf-8", newline="") as f:
         w = csv.writer(f, delimiter="\t")
@@ -224,19 +225,19 @@ def main(args):
 
     print(json.dumps(metrics, ensure_ascii=False, indent=2))
     print(
-        f"\n95% CI (бутстрап, {N_BOOT} прогонов, n={metrics['n_utt']} уттерансов):"
+        f"\n95% CI (bootstrap, {N_BOOT} resamples, n={metrics['n_utt']} utterances):"
     )
     print(f"  WER_norm: [{metrics['WER_norm_ci95'][0]}, {metrics['WER_norm_ci95'][1]}]")
     print(f"  WER_stem: [{metrics['WER_stem_ci95'][0]}, {metrics['WER_stem_ci95'][1]}]")
-    print("\nТипы ошибок:")
+    print("\nError types:")
     total = sum(types.values())
     for t, c in types.most_common():
         print(f"  {c:5d}  {100*c/total:5.1f}%  {t}")
-    print("\nТоп подмен символов:")
+    print("\nTop character confusions:")
     for c, n in chars.most_common(15):
         print(f"  {n:5d}  {c}")
-    print(f"\nКандидатов в галлюцинации: {len(halluc)}")
-    print(f"Определённый язык: {lang_counter.most_common()}")
+    print(f"\nHallucination candidates: {len(halluc)}")
+    print(f"Detected language: {lang_counter.most_common()}")
 
 
 if __name__ == "__main__":

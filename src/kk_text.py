@@ -1,17 +1,17 @@
 """
-Нормализация казахского текста + грубый морфологический стеммер.
+Kazakh text normalization plus a rough morphological stemmer.
 
-Зачем это отдельным модулем: на казахском значительная часть WER — не ошибка
-акустической модели, а (а) разница пунктуации/регистра и (б) один неверный
-аффикс, из-за которого слово целиком считается заменой. Мы хотим уметь
-разделить эти вещи и показать цифрами.
+Why this is a separate module: on Kazakh, a large chunk of WER isn't an
+acoustic-model error at all. It's (a) a punctuation/case mismatch, or (b)
+one wrong affix that makes the whole word count as a substitution. We want
+to split these apart and show the numbers.
 """
 
 import re
 import unicodedata
 
-# Казахские специфические буквы и их "русские" аналоги, в которые их чаще
-# всего схлопывает модель, обученная преимущественно на русском.
+# Kazakh-specific letters and the Russian look-alikes a model trained mostly
+# on Russian most often collapses them into.
 KK_FOLD_MAP = {
     "ә": "а",
     "ғ": "г",
@@ -27,9 +27,9 @@ KK_FOLD_MAP = {
 PUNCT_RE = re.compile(r"[^\w\s]", flags=re.UNICODE)
 SPACE_RE = re.compile(r"\s+")
 
-# Наиболее частотные казахские аффиксы (падеж, число, притяжательность,
-# сказуемость, часть глагольных). Список сознательно неполный и грубый —
-# это эвристика для классификации ошибок, а не морфоанализатор.
+# Most frequent Kazakh affixes (case, plural, possessive, predicate, some
+# verb forms). Deliberately incomplete and rough: this is a heuristic for
+# classifying errors, not a real morphological analyzer.
 SUFFIXES = [
     "дікі", "тікі", "нікі",
     "дағы", "дегі", "тағы", "тегі", "ндағы", "ндегі",
@@ -58,11 +58,11 @@ MIN_STEM = 3
 
 
 def normalize(text: str, fold_kk: bool = False) -> str:
-    """Приводим к сравнимому виду: NFC, нижний регистр, без пунктуации.
+    """Bring text to a comparable form: NFC, lowercase, no punctuation.
 
-    fold_kk=True дополнительно схлопывает ә/ө/ұ/ү/і/ң/қ/ғ в русские аналоги —
-    это даёт "снисходительный" WER, разница с обычным показывает, сколько
-    ошибок приходится ровно на казахскую графику.
+    fold_kk=True additionally folds ә/ө/ұ/ү/і/ң/қ/ғ into their Russian
+    look-alikes. That gives a "lenient" WER, and the difference from the
+    regular one shows how many errors are down to Kazakh-specific graphemes.
     """
     text = unicodedata.normalize("NFC", text)
     text = text.lower().replace("ё", "е").replace("-", " ")
@@ -73,7 +73,7 @@ def normalize(text: str, fold_kk: bool = False) -> str:
 
 
 def stem(word: str) -> str:
-    """Грубо срезаем аффиксы. Итеративно, максимум 3 прохода."""
+    """Roughly strip affixes. Iterative, up to 3 passes."""
     for _ in range(3):
         for suf in SUFFIXES:
             if word.endswith(suf) and len(word) - len(suf) >= MIN_STEM:

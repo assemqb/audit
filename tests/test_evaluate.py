@@ -7,23 +7,23 @@ from evaluate import bootstrap_wer_ci, classify  # noqa: E402
 
 
 def test_classify_special_letters_only():
-    # "қала" vs "кала" — only ә/ө/ұ/ү/і/ң/қ/ғ differ, root+suffix identical
+    # "қала" vs "кала": only ә/ө/ұ/ү/і/ң/қ/ғ differ, root+suffix identical
     assert classify("қала", "кала") == "спецбуквы (ә/ө/ұ/ү/і/ң/қ/ғ)"
 
 
 def test_classify_affix_only():
-    # same root "кітап", different case suffix — a morphology miss, not a new word
+    # same root "кітап", different case suffix: a morphology miss, not a new word
     assert classify("кітапта", "кітаптан") == "аффикс (морфология)"
 
 
 def test_classify_full_replacement():
     # neither word contains a special letter, so this can't be misfiled as
-    # "спецбуквы" or "уход в русскую графику" — a genuine unrelated swap
+    # "спецбуквы" or "уход в русскую графику": a genuine unrelated swap
     assert classify("бару", "алу") == "полная замена слова"
 
 
 def test_classify_kk_letter_lost_beats_full_replacement():
-    # "кітап" has "і" (a special letter) but no shared root with "теледидар" —
+    # "кітап" has "і" (a special letter) but no shared root with "теледидар".
     # has_kk_letter fires before the code would otherwise call this a full
     # replacement, which is the documented priority order in classify()
     assert classify("кітап", "теледидар") == "уход в русскую графику"

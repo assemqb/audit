@@ -26,7 +26,7 @@ def test_stem_strips_known_suffix():
     # "кітаптар" (books) = "кітап" + plural suffix "тар". The stemmer is a
     # documented rough heuristic (up to 3 greedy passes), not a real
     # morphoanalyzer, and here it over-strips past the true root ("кітап")
-    # down to "кіт" — this test pins that known limitation so it doesn't
+    # down to "кіт". This test pins that known limitation so it doesn't
     # silently drift, rather than pretending the heuristic is exact.
     assert stem("кітаптар") == "кіт"
 

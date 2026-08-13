@@ -1,14 +1,14 @@
 """
-Шаг 2. Прогоняем ASR по подготовленным wav-файлам.
+Step 2. Run ASR over the prepared wav files.
 
-По умолчанию faster-whisper. Логируем не только текст, но и no_speech_prob,
-avg_logprob и время работы — это пригодится для разбора галлюцинаций и для
-раздела "насколько цифрам можно верить".
+Uses faster-whisper. We log not just the text but also no_speech_prob,
+avg_logprob, and timing. That's useful later for spotting hallucinations
+and for the "how much can we trust these numbers" section.
 
-Пример:
+Example:
   python src/transcribe.py --model large-v3 --lang kk
   python src/transcribe.py --model small   --lang kk
-  python src/transcribe.py --model large-v3 --lang None   # автоопределение языка
+  python src/transcribe.py --model large-v3 --lang None   # auto-detect language
 """
 
 import argparse
@@ -55,7 +55,7 @@ def main(args):
             wav,
             language=lang,
             beam_size=args.beam_size,
-            vad_filter=False,          # намеренно без VAD: хотим увидеть галлюцинации
+            vad_filter=False,          # deliberately no VAD: we want to see hallucinations
             condition_on_previous_text=False,
         )
         segments = list(segments)
@@ -93,8 +93,8 @@ def main(args):
         w.writeheader()
         w.writerows(out_rows)
 
-    print(f"\nГотово: {out_path}")
-    print(f"Аудио: {total_audio/60:.2f} мин, время работы: {elapsed/60:.2f} мин")
+    print(f"\nDone: {out_path}")
+    print(f"Audio: {total_audio/60:.2f} min, elapsed: {elapsed/60:.2f} min")
     print(f"RTF: {elapsed/total_audio:.3f}")
 
 
