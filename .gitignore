@@ -1,0 +1,7 @@
+*.wav
+__pycache__/
+data/audio/
+.venv/
+.hf_cache/
+results/*.tsv
+results/*.json
